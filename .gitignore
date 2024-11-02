@@ -1,0 +1,4 @@
+.vscode
+*.exe
+logs/
+test.c
