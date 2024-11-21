@@ -3,7 +3,8 @@
 typedef enum {
   LOG_INFO,
   LOG_WARNING,
-  LOG_ERROR
+  LOG_ERROR,
+  LOG_NUM_TYPES
 } log_type;
 
 const char* current_time(void);

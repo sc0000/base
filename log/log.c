@@ -43,6 +43,9 @@ void flog(log_type type, const char* msg) {
     case LOG_ERROR:
       sprintf(typed_msg, "ERROR [%s]\t%s\n", current_time(), msg);
       break;
+
+    case LOG_NUM_TYPES:
+      break;
   }
 
   dir_ensure("logs");
