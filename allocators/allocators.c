@@ -359,14 +359,6 @@ void* free_list_alloc(free_list_t* fl, size_t size, fl_policy policy)
 void* free_list_alloc_align(free_list_t* fl, size_t size, fl_policy policy, uintptr_t align)
 {
   if (!fl) return NULL;
-
-  // // TODO: Remove!
-  // fl_hdr_t* test_hdr = fl_first_hdr(fl);
-  // int counter = 1;
-  // while (test_hdr) {
-  //   printf("alloc test: header %d block size %llu\n", counter++, fl_hdr_get_block_size(test_hdr));
-  //   test_hdr = test_hdr->linked_hdr;
-  // }
   
   fl_hdr_t* hdr = NULL;
   fl_hdr_t* prev_hdr = NULL;
@@ -389,11 +381,10 @@ void* free_list_alloc_align(free_list_t* fl, size_t size, fl_policy policy, uint
     return NULL;
   }
 
-  fl_hdr_set_block_size(hdr, 0);
-  fl_hdr_set_occupied(hdr, true);
+  hdr->block_size = 0;
 
-  size_t aligned_hdr_size = align_size(sizeof(fl_hdr_t), align);
-  uintptr_t ptr_pos = (uintptr_t)hdr + (uintptr_t)aligned_hdr_size;
+  size_t hdr_size = align_size(sizeof(fl_hdr_t), align);
+  uintptr_t ptr_pos = (uintptr_t)hdr + (uintptr_t)hdr_size;
 
   // printf("fl_alloc ptr pos %llu\n", ptr_pos - (uintptr_t)fl->buf);
 
@@ -406,14 +397,11 @@ void* free_list_alloc_align(free_list_t* fl, size_t size, fl_policy policy, uint
     (uintptr_t)hdr->linked_hdr - aligned_block_end :
     (uintptr_t)(fl->buf + fl->size) - aligned_block_end;
 
-
   // Only create a new header if there's at least a number of bytes equal
   // to the given alignment left.
-  if (space_left >= ((uintptr_t)aligned_hdr_size + align)) {
+  if (space_left >= ((uintptr_t)hdr_size + align)) {
     fl_hdr_t* new_hdr = (fl_hdr_t*)(aligned_block_end);
-    fl_hdr_set_block_size(new_hdr, space_left - aligned_hdr_size);
-    fl_hdr_set_occupied(new_hdr, false);
-    // printf("new hdr block size %llu\n", fl_hdr_get_block_size(new_hdr));
+    new_hdr->block_size = space_left - hdr_size;
     new_hdr->linked_hdr = hdr->linked_hdr;
     hdr->linked_hdr = new_hdr; 
   }
@@ -437,23 +425,14 @@ void  free_list_free_align(free_list_t* fl, void* element, size_t element_size, 
   }
   
   fl_hdr_t* hdr = (fl_hdr_t*)((uintptr_t)element - hdr_size);
-
-  fl_hdr_set_occupied(hdr, false);
   
-  size_t block_size = fl_hdr_get_block_size(hdr);
-  fl_hdr_set_block_size(hdr, block_size + align_size(element_size, align));
+  hdr->block_size += align_size(element_size, align);
 
   fl_hdr_t* linked_hdr = hdr->linked_hdr;
-  size_t linked_hdr_block_size = fl_hdr_get_block_size(linked_hdr);
 
   // Try to splice the following block.
-  if (linked_hdr && linked_hdr_block_size > 0) {
-    block_size = fl_hdr_get_block_size(hdr);
-    
-    printf("free_list_free #%d: (foll) block size to splice %llu existing block size %llu hdr size %llu\n", 
-        call, linked_hdr_block_size, block_size, hdr_size);
-
-    fl_hdr_set_block_size(hdr, block_size + hdr_size + linked_hdr_block_size);
+  if (linked_hdr && linked_hdr->block_size > 0) {
+    hdr->block_size += hdr_size + linked_hdr->block_size;
     hdr->linked_hdr = linked_hdr->linked_hdr;
   }
 
@@ -472,18 +451,11 @@ void  free_list_free_align(free_list_t* fl, void* element, size_t element_size, 
   
   if (prev_hdr) {
     printf("free_list_free #%d: prev hdr offset %llu size %llu\n", 
-      call, (uintptr_t)prev_hdr - (uintptr_t)fl->buf, fl_hdr_get_block_size(prev_hdr));
+      call, (uintptr_t)prev_hdr - (uintptr_t)fl->buf, prev_hdr->block_size);
 
-    if (fl_hdr_get_block_size(prev_hdr) > 0) {
-      fl_hdr_set_occupied(prev_hdr, false);
-      block_size = fl_hdr_get_block_size(hdr);
-      size_t prev_hdr_block_size = fl_hdr_get_block_size(prev_hdr);
-      printf("free_list_free #%d: (prev) block size to splice %llu existing block size %llu hdr size %llu\n", 
-        call, block_size, prev_hdr_block_size, hdr_size);
-      fl_hdr_set_block_size(prev_hdr, prev_hdr_block_size + hdr_size + block_size);
+    if (prev_hdr->block_size > 0) {
+      prev_hdr->block_size += hdr_size + hdr->block_size;
       prev_hdr->linked_hdr = hdr->linked_hdr;
-      printf("free_list_free #%d: Prev block has size %llu after splice\n", 
-        call, fl_hdr_get_block_size(prev_hdr));
     }
 
     else printf("free_list_free #%d: prev hdr is occupied\n", call);

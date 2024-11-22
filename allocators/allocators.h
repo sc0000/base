@@ -86,34 +86,6 @@ typedef enum {
   NUM_POLICIES
 } fl_policy;
 
-#define OCCUPIED_MASK ((size_t)1 << (sizeof(size_t) * 8 - 1))
-#define SIZE_MASK (~OCCUPIED_MASK)
-
-static inline fl_hdr_t* fl_first_hdr(free_list_t* fl) {
-  return (fl_hdr_t*)fl->buf;
-}
-
-// static inline bool fl_hdr_get_occupied(fl_hdr_t* hdr) {
-//   return (hdr->block_size & OCCUPIED_MASK) != 0; 
-// }
-
-static inline bool fl_hdr_get_occupied(fl_hdr_t* hdr) {
-  return hdr->block_size == 0; 
-}
-
-static inline void fl_hdr_set_occupied(fl_hdr_t* hdr, bool b) {
-  if (b) hdr->block_size |= OCCUPIED_MASK;
-  else   hdr->block_size &= SIZE_MASK;
-}
-
-static inline size_t fl_hdr_get_block_size(fl_hdr_t* hdr) {
-  return hdr->block_size & SIZE_MASK;
-}
-
-static inline void fl_hdr_set_block_size(fl_hdr_t* hdr, size_t size) {
-  hdr->block_size = size | OCCUPIED_MASK;
-}
-
 void  free_list_init(free_list_t* fl, void* buf, size_t size);
 void  free_list_init_align(free_list_t* fl, void* buf, size_t size, uintptr_t align);
 void* free_list_alloc(free_list_t* fl, size_t size, fl_policy policy);
