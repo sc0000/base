@@ -143,7 +143,7 @@ void arena_zero(arena_t* a)
 
 void  arena_pop(arena_t* a)
 {
-  // TODO: Implement!
+  a->curr_offset = a->prev_offset;
 }
 
 void arena_free(arena_t* a)
