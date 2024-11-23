@@ -37,11 +37,11 @@ void flog(log_type type, const char* msg) {
       break;
 
     case LOG_WARNING: 
-      sprintf(typed_msg, "WARNING [%s]\t%s\n", current_time(), msg);
+      sprintf(typed_msg, "WARN [%s]\t%s\n", current_time(), msg);
       break;
 
     case LOG_ERROR:
-      sprintf(typed_msg, "ERROR [%s]\t%s\n", current_time(), msg);
+      sprintf(typed_msg, "ERR  [%s]\t%s\n", current_time(), msg);
       break;
 
     case LOG_NUM_TYPES:
