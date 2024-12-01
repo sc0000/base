@@ -1,6 +1,5 @@
-.vscode
-*.exe
-logs/
-test.c
-scratch.c
-*.txt
+/*
+
+!/src
+!.gitignore
+!Makefile

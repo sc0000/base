@@ -1,7 +1,8 @@
-#include "fileio.h"
+#include "base/fileio.h"
 
-#include <stdio.h>
-#include <sys/stat.h>
+#ifdef _MSC_VER
+  #define _CRT_SECURE_NO_WARNINGS
+#endif
 
 #ifdef _WIN32
   #include <direct.h>
@@ -10,6 +11,9 @@
   #include <unistd.h>
   #define MKDIR(path) mkdir(path, 0755)
 #endif
+
+#include <stdio.h>
+#include <sys/stat.h>
 
 void dir_ensure(const char* path) {
   struct stat st;

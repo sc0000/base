@@ -1,11 +1,15 @@
 #include "log.h"
 
+#ifdef _MSC_VER
+  #define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <sys/stat.h>
 #include <direct.h>
 #include <stdio.h>
 #include <time.h>
 
-#include "../fileio/fileio.h"
+#include "base/fileio.h"
 
 char log_file[256];
 char time_str[256];
@@ -29,7 +33,7 @@ void store_startup_time(void) {
 }
 
 void flog(log_type type, const char* msg) {
-  char typed_msg[256];
+  char typed_msg[512];
   
   switch (type) {
     case LOG_INFO: 
