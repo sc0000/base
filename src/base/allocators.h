@@ -57,7 +57,7 @@ bool within_bounds(void* ptr, unsigned char* buf, size_t buf_size);
 
 */
 
-typedef struct da_hdr_t {
+typedef struct da_hdr {
   size_t capacity;
   size_t occupied;
   size_t element_size;
@@ -165,7 +165,7 @@ void darray_shrink_to_fit_base(void** darray);
 
 */
 
-typedef struct arena_t {
+typedef struct arena {
   unsigned char* buf;
   size_t size;
   size_t curr_offset;
@@ -244,11 +244,11 @@ static inline void arena_clear(arena_t* a)
 
 */
 
-typedef struct hdr_t {
-  struct hdr_t* linked_hdr;
+typedef struct hdr {
+  struct hdr* linked_hdr;
 } hdr_t;
 
-typedef struct stack_t {
+typedef struct stack {
   unsigned char* buf;
   hdr_t* curr_hdr;
   size_t size;
@@ -324,7 +324,7 @@ static inline void stack_clear(stack_t* s)
 
 */
 
-typedef struct pool_t {
+typedef struct pool {
   unsigned char* buf;
   hdr_t* curr_hdr;
   size_t size;
@@ -369,12 +369,12 @@ void  pool_free_all(pool_t* p);
 
 */
 
-typedef struct fl_hdr_t {
-  struct fl_hdr_t* linked_hdr;
+typedef struct fl_hdr {
+  struct fl_hdr* linked_hdr;
   size_t block_size;
 } fl_hdr_t;
 
-typedef struct free_list_t {
+typedef struct free_list {
   unsigned char* buf;
   size_t size;
 } free_list_t;
