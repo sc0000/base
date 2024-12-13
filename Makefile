@@ -25,8 +25,8 @@ lib:
 	make clean
 	
 clean:
-	rm *.o *.exe || true
-	rm -r logs || true
+	-rm *.o *.exe
+	-rm -r logs
 
 clean-build:
-	rm -r $(BUILD_DIR) || true
+	-rm -r $(BUILD_DIR)
