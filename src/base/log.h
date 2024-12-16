@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdarg.h>
+
 typedef enum {
   LOG_INFO,
   LOG_WARNING,
@@ -9,4 +11,4 @@ typedef enum {
 
 const char* current_time(void);
 void store_startup_time(void);
-void flog(log_type type, const char* msg);
+void flog(log_type type, const char* format, ...);

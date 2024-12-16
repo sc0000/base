@@ -5,7 +5,7 @@ BUILD_DIR = base
 INCLUDE_DIR = $(BUILD_DIR)/include/base
 LIB_DIR = $(BUILD_DIR)/lib
 LIB_FILE = libbase.a
-O_FILES = allocators.o fileio.o log.o
+O_FILES = allocators.o fileio.o log.o mem_utils.o
 
 test:
 	gcc $(COMP_FLAGS) -I src \
@@ -26,7 +26,7 @@ lib:
 	
 clean:
 	-rm *.o *.exe
-	-rm -r logs
+	-rm -r base_logs
 
 clean-build:
 	-rm -r $(BUILD_DIR)
