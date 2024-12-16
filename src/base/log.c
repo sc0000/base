@@ -34,11 +34,13 @@ void store_startup_time(void) {
 void flog(log_type type, const char* format, ...) {
   va_list args;
   va_start(args, format);
+
   char msg[256];
   vsnprintf(msg, sizeof(msg), format, args);
+  
   va_end(args);
 
-  char typed_msg[512];
+  char typed_msg[1024];
 
   switch (type) {
     case LOG_INFO: 

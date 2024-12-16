@@ -1,55 +1,6 @@
 #include "base/allocators.h"
 #include "base/log.h"
-
-bool within_bounds(void* ptr, unsigned char* buf, size_t buf_size)
-{
-  uintptr_t uptr = (uintptr_t)ptr;
-  uintptr_t ubuf = (uintptr_t)buf;
-  uintptr_t uend = (ubuf + (uintptr_t)buf_size);
-  
-  return (uptr > ubuf && uptr < uend);
-}
-
-uintptr_t align_ptr(uintptr_t ptr, uintptr_t align)
-{
-  static int call_count = 0;
-
-  char msg[512];
-  sprintf(msg, "Given pointer alignment (#%d) no power of 2", call_count++);
-
-  if (!is_pow2(align)) {
-    flog(LOG_ERROR, msg);
-    exit(EXIT_FAILURE);
-  }
-
-  uintptr_t mod = ptr & (align - 1);
-
-  if (mod != 0)
-    ptr += align - mod;
-
-  return ptr;
-}
-
-uintptr_t align_size(size_t size, uintptr_t align)
-{
-  static int call_count = 0;
-
-  char msg[512];
-  sprintf(msg, "Given size alignment (#%d) no power of 2", call_count++);
-
-  if (!is_pow2(align)) {
-    flog(LOG_ERROR, "Given alignment no power of 2");
-    exit(EXIT_FAILURE);
-  }
-
-  uintptr_t size_ptr = (uintptr_t)size;
-  uintptr_t mod = size_ptr & (align - 1);
-
-  if (mod != 0)
-    size_ptr += align - mod;
-
-  return size_ptr;
-}
+#include "base/mem_utils.h"
 
 void* darray_init(size_t element_size, size_t num)
 {
@@ -58,14 +9,17 @@ void* darray_init(size_t element_size, size_t num)
   size_t raw_size = hdr_size + element_size * num;
   void* raw = malloc(raw_size);
 
+  if (!raw) {
+    flog(LOG_ERROR, "darray_init(): buffer allocation failed");
+    exit(EXIT_FAILURE);
+  }
+
   da_hdr_t* hdr = (da_hdr_t*)raw;
-  printf("darray_init: hdr address %llx\n", (uintptr_t)hdr);
   hdr->capacity = num;
   hdr->occupied = 0;
   hdr->element_size = element_size;
 
   void* buf = (void*)((uintptr_t)hdr + hdr_size);
-  printf("darray_init: buf address %llx\n", (uintptr_t)buf);
 
   return buf;
 }
@@ -87,7 +41,7 @@ void* darray_alloc(void* darray, size_t element_size, size_t num)
     void* new_raw = realloc(hdr, new_size);
     
     if (!new_raw) {
-        flog(LOG_ERROR, "darray_alloc: re-allocation failed");
+        flog(LOG_ERROR, "darray_alloc(): re-allocation failed");
         exit(EXIT_FAILURE);
     }
 
@@ -103,6 +57,8 @@ void* darray_alloc(void* darray, size_t element_size, size_t num)
 void* darray_make_space(void* darray, size_t pos, size_t element_size, size_t num)
 {
   darray = darray_alloc(darray, element_size, num);
+
+  // darray_alloc() guarantees a valid darray (or crash).
 
   uintptr_t ptr = (uintptr_t)darray;
   da_hdr_t* hdr = darray_get_hdr(darray);
@@ -121,7 +77,7 @@ void* darray_make_space(void* darray, size_t pos, size_t element_size, size_t nu
 
 void darray_pop_last(void* darray)
 {
-  if (!darray) return;
+  VALIDATE_PTR(darray);
 
   da_hdr_t* hdr = darray_get_hdr(darray);
   hdr->occupied -= 1;
@@ -129,7 +85,7 @@ void darray_pop_last(void* darray)
 
 void darray_pop_first(void* darray)
 {
-  if (!darray) return;
+  VALIDATE_PTR(darray);
 
   da_hdr_t* hdr = darray_get_hdr(darray);
   uintptr_t second_element_ptr = (uintptr_t)darray + (uintptr_t)hdr->element_size;
@@ -141,7 +97,7 @@ void darray_pop_first(void* darray)
 
 void darray_clear(void* darray)
 {
-  if (!darray) return;
+  VALIDATE_PTR(darray);
 
   da_hdr_t* hdr = darray_get_hdr(darray);
   hdr->occupied = 0;
@@ -149,10 +105,7 @@ void darray_clear(void* darray)
 
 void darray_reset_size(void* darray, size_t size)
 {
-  if (!darray) {
-    flog(LOG_WARNING, "darray_reset: darray invalid");
-    return;
-  }
+  VALIDATE_PTR(darray);
 
   da_hdr_t* hdr = darray_get_hdr(darray);
 
@@ -166,10 +119,7 @@ void darray_reset_size(void* darray, size_t size)
 
 size_t darray_size(void* darray)
 {
-  if (!darray) {
-    flog(LOG_WARNING, "darray_size: darray invalid");
-    return 0;
-  }
+  VALIDATE_PTR(darray, 0);
 
   da_hdr_t* hdr = darray_get_hdr(darray);
   return hdr->occupied;
@@ -177,10 +127,7 @@ size_t darray_size(void* darray)
 
 size_t darray_capacity(void* darray)
 {
-  if (!darray) {
-    flog(LOG_WARNING, "darray_size: darray invalid");
-    return 0;
-  }
+  VALIDATE_PTR(darray, 0);
 
   da_hdr_t* hdr = darray_get_hdr(darray);
   return hdr->capacity;
@@ -188,10 +135,7 @@ size_t darray_capacity(void* darray)
 
 void darray_reserve_base(void** darray, size_t new_cap)
 {
-  if (!*darray) {
-    flog(LOG_WARNING, "darray_reserve: darray invalid");
-    return;
-  }
+  VALIDATE_PTR(*darray);
 
   da_hdr_t* hdr = darray_get_hdr(*darray);
 
@@ -202,10 +146,7 @@ void darray_reserve_base(void** darray, size_t new_cap)
 
   void* new_raw = realloc(hdr, new_size);
     
-  if (!new_raw) {
-      flog(LOG_ERROR, "darray_alloc: re-allocation failed");
-      exit(EXIT_FAILURE);
-  }
+  VALIDATE_PTR(new_raw);
 
   hdr = (da_hdr_t*)new_raw;
   hdr->capacity = new_cap; 
@@ -215,10 +156,7 @@ void darray_reserve_base(void** darray, size_t new_cap)
 
 void darray_shrink_to_fit_base(void** darray)
 {
-  if (!*darray) {
-    flog(LOG_WARNING, "darray_shrink_to_fit: darray invalid");
-    return;
-  }
+  VALIDATE_PTR(*darray);
 
   da_hdr_t* hdr = darray_get_hdr(*darray);
   uintptr_t hdr_size = align_size(sizeof(da_hdr_t), DEFAULT_ALIGN);
@@ -240,6 +178,8 @@ void darray_shrink_to_fit_base(void** darray)
 
 void arena_init(arena_t* a, void* buf, size_t size)
 {
+  VALIDATE_PTR(buf);
+
   a->size = size;
   a->curr_offset = 0;
   a->prev_offset = 0;
@@ -248,6 +188,8 @@ void arena_init(arena_t* a, void* buf, size_t size)
 
 void* arena_alloc_align(arena_t* a, size_t size, uintptr_t align)
 {
+  VALIDATE_PTR(a, NULL);
+
   uintptr_t curr_ptr = (uintptr_t)(a->buf + a->curr_offset);
   uintptr_t offset_ptr = align_ptr(curr_ptr, align);
   offset_ptr -= (uintptr_t)a->buf;
@@ -267,6 +209,8 @@ void* arena_alloc_align(arena_t* a, size_t size, uintptr_t align)
 
 void arena_resize_element_align(arena_t* a, void* element, size_t old_size, size_t new_size, uintptr_t align)
 {
+  VALIDATE_PTR(a);
+
   if (!element) {
     element = arena_alloc_align(a, new_size, align);
     return;
@@ -323,6 +267,8 @@ uintptr_t align_ptr_hdr(uintptr_t ptr, uintptr_t align, size_t hdr_size)
 
 void stack_init(stack_t* s, void* buf, size_t size)
 {
+  VALIDATE_PTR(buf);
+
   s->size = size;
   s->curr_offset = 0;
   s->curr_hdr = NULL;
@@ -331,10 +277,13 @@ void stack_init(stack_t* s, void* buf, size_t size)
 
 void* stack_alloc_align(stack_t* s, size_t size, uintptr_t align)
 {
+  VALIDATE_PTR(s, NULL);
+
   uintptr_t curr_ptr = (uintptr_t)(s->buf + s->curr_offset);
   uintptr_t offset_ptr = align_ptr_hdr(curr_ptr, align, sizeof(hdr_t));
   offset_ptr -= (uintptr_t)s->buf;
 
+  // ???
   if ((size_t)offset_ptr + size > s->size) {
     flog(LOG_ERROR, "Stack allocation out of bounds");
     exit(EXIT_FAILURE);
@@ -362,7 +311,7 @@ void stack_resize_element_align(stack_t* s, void* element, size_t old_size, size
   
   unsigned char* i = (unsigned char*)element;
   
-  if (s->buf > i || i > s->buf + s->size) {
+  if (!within_bounds(i, s->buf, s->size)) {
     flog(LOG_ERROR, "Resized stack element out of bounds");
     exit(EXIT_FAILURE);
   } 
@@ -386,6 +335,8 @@ void stack_resize_element_align(stack_t* s, void* element, size_t old_size, size
 
 void pool_init_align(pool_t* p, void* buf, size_t size, size_t slot_size, uintptr_t align)
 {
+  VALIDATE_PTR(buf);
+
   uintptr_t buf_zero = (uintptr_t)buf;
   uintptr_t buf_zero_aligned = align_ptr(buf_zero, align);
   size -= buf_zero_aligned - buf_zero;
@@ -401,17 +352,11 @@ void pool_init_align(pool_t* p, void* buf, size_t size, size_t slot_size, uintpt
 
 void* pool_alloc(pool_t* p)
 {
-  if (!p) {
-    flog(LOG_WARNING, "Pool allocation failed: Pointer to pool is null.");
-    return NULL;
-  }
+  VALIDATE_PTR(p, NULL);
 
   hdr_t* hdr = p->curr_hdr;
 
-  if (!hdr) {
-    flog(LOG_WARNING, "Pool allocation failed: No free slot");
-    return NULL;
-  }
+  VALIDATE_PTR(hdr, NULL);
 
   p->curr_hdr = p->curr_hdr->linked_hdr;
   return memset(hdr, 0, p->slot_size);
@@ -419,12 +364,16 @@ void* pool_alloc(pool_t* p)
 
 void pool_free(pool_t* p, void* slot)
 {
+  VALIDATE_PTR(p);
+  VALIDATE_PTR(slot);
+
   uintptr_t buf_int = (uintptr_t)p->buf;
   uintptr_t end_int = (uintptr_t)(p->buf + p->size);
   uintptr_t seg_int = (uintptr_t)slot;
 
-  if (!seg_int || seg_int < buf_int || seg_int >= end_int) {
-    flog(LOG_WARNING, "Failed to free pool slot: Given address null or out of bounds");
+  // ???
+  if (seg_int < buf_int || seg_int >= end_int) {
+    flog(LOG_WARNING, "Failed to free pool slot: Given address out of bounds");
     return;
   }
 
@@ -436,6 +385,8 @@ void pool_free(pool_t* p, void* slot)
 
 void pool_free_all(pool_t* p)
 {
+  VALIDATE_PTR(p);
+
   size_t slot_count = p->size / p->slot_size;
 
   for (size_t i = 0; i < slot_count; ++i) {
@@ -458,15 +409,11 @@ void free_list_init_align(free_list_t* fl, void* buf, size_t size, uintptr_t ali
   size_t hdr_size = align_size(sizeof(fl_hdr_t), align);
   first_hdr->linked_hdr = NULL;
   first_hdr->block_size = size - hdr_size;
-
-  char msg[256];
-  sprintf(msg, "Free list init. Size aligned to %llu (diff %llu)", size, diff);
-  flog(LOG_INFO, msg);
 }
 
 void* free_list_alloc_align(free_list_t* fl, size_t size, fl_policy policy, uintptr_t align)
 {
-  if (!fl) return NULL;
+  VALIDATE_PTR(fl, NULL);
   
   fl_hdr_t* hdr = NULL;
   fl_hdr_t* prev_hdr = NULL;
@@ -486,17 +433,12 @@ void* free_list_alloc_align(free_list_t* fl, size_t size, fl_policy policy, uint
     break;
   }
 
-  if (!hdr) {
-    flog(LOG_WARNING, "Free list allocation failed: not enough space");
-    return NULL;
-  }
+  VALIDATE_PTR(hdr, NULL);
 
   hdr->block_size = 0;
 
   size_t hdr_size = align_size(sizeof(fl_hdr_t), align);
   uintptr_t ptr_pos = (uintptr_t)hdr + (uintptr_t)hdr_size;
-
-  // printf("fl_alloc ptr pos %llu\n", ptr_pos - (uintptr_t)fl->buf);
 
   void* ptr = (void*)align_ptr(ptr_pos, align);
 
@@ -519,11 +461,10 @@ void* free_list_alloc_align(free_list_t* fl, size_t size, fl_policy policy, uint
   return memset(ptr, 0, size);
 }
 
-void  free_list_free_align(free_list_t* fl, void* element, size_t element_size, uintptr_t align) {
+void free_list_free_align(free_list_t* fl, void* element, size_t element_size, uintptr_t align) {
   uintptr_t hdr_size = align_size(sizeof(fl_hdr_t), align);
 
-  // ???
-  static int call = 1;
+  VALIDATE_PTR(fl);
 
   if (!within_bounds(element, fl->buf, fl->size)) {
     flog(LOG_WARNING, "free_list_free: the element to be freed is not in the given buffer");
@@ -536,15 +477,13 @@ void  free_list_free_align(free_list_t* fl, void* element, size_t element_size, 
 
   fl_hdr_t* linked_hdr = hdr->linked_hdr;
 
-  // Try to splice the following block.
+  // Try to merge the following block.
   if (linked_hdr && linked_hdr->block_size > 0) {
     hdr->block_size += hdr_size + linked_hdr->block_size;
     hdr->linked_hdr = linked_hdr->linked_hdr;
   }
 
-  else printf("free_list_free #%d: foll hdr is occupied\n", call);
-
-  // Try to splice into the previous block.
+  // Try to merge into the previous block.
   fl_hdr_t* prev_hdr = NULL;
   fl_hdr_t* nhdr = fl_first_hdr(fl);
 
@@ -555,22 +494,16 @@ void  free_list_free_align(free_list_t* fl, void* element, size_t element_size, 
     nhdr = nhdr->linked_hdr;
   }
   
-  if (prev_hdr) {
-    printf("free_list_free #%d: prev hdr offset %llu size %llu\n", 
-      call, (uintptr_t)prev_hdr - (uintptr_t)fl->buf, prev_hdr->block_size);
-
-    if (prev_hdr->block_size > 0) {
-      prev_hdr->block_size += hdr_size + hdr->block_size;
-      prev_hdr->linked_hdr = hdr->linked_hdr;
-    }
-
-    else printf("free_list_free #%d: prev hdr is occupied\n", call);
+  if (prev_hdr && prev_hdr->block_size > 0) {
+    prev_hdr->block_size += hdr_size + hdr->block_size;
+    prev_hdr->linked_hdr = hdr->linked_hdr;
   }
-
-  ++call;
 }
 
-void free_list_free_all_align(free_list_t* fl, uintptr_t align) { 
+void free_list_free_all_align(free_list_t* fl, uintptr_t align)
+{
+  VALIDATE_PTR(fl);
+
   fl_hdr_t* first_hdr = fl_first_hdr(fl);
   size_t hdr_size = (size_t)align_size(sizeof(fl_hdr_t), align);
 
@@ -580,22 +513,19 @@ void free_list_free_all_align(free_list_t* fl, uintptr_t align) {
 
 void free_list_find_first(free_list_t* fl, size_t size, fl_hdr_t** found_hdr, fl_hdr_t** prev_hdr)
 {
+  VALIDATE_PTR(fl);
+
   fl_hdr_t* hdr = fl_first_hdr(fl);
   fl_hdr_t* phdr = NULL;
-
-  int counter = 0;
 
   while (hdr) {
     size_t curr_size = hdr->block_size;
 
-    if (curr_size >= size) {
-      printf("find_first: header %d block size %llu\n", counter, curr_size);
+    if (curr_size >= size)
       break;
-    }
 
     phdr = hdr;
     hdr = hdr->linked_hdr;
-    ++counter;
   }
 
   *found_hdr = hdr;
@@ -604,16 +534,14 @@ void free_list_find_first(free_list_t* fl, size_t size, fl_hdr_t** found_hdr, fl
 
 void free_list_find_best(free_list_t* fl, size_t size, fl_hdr_t** found_hdr, fl_hdr_t** prev_hdr)
 {
-  fl_hdr_t* first_hdr = fl_first_hdr(fl); // TODO: Remove (see below).
+  VALIDATE_PTR(fl);
+
   fl_hdr_t* hdr = fl_first_hdr(fl);
   fl_hdr_t* phdr = NULL;
   size_t best_size = SIZE_MAX;
 
-  int counter = 0;
-
   while (hdr) {
     size_t curr_size = hdr->block_size;
-    printf("find_best: header %d block size %llu\n", counter++, curr_size);
 
     if (curr_size >= size && curr_size < best_size) {
       *found_hdr = hdr;
@@ -624,12 +552,4 @@ void free_list_find_best(free_list_t* fl, size_t size, fl_hdr_t** found_hdr, fl_
     phdr = hdr;
     hdr = hdr->linked_hdr;
   }
-
-  // TODO: Remove.
-  if (*prev_hdr)
-    printf("Free list found best at offset %lld with prev_hdr at offset %lld\n", 
-      (uintptr_t)*found_hdr - (uintptr_t)first_hdr, (uintptr_t)*prev_hdr - (uintptr_t)first_hdr);
-
-  else 
-    printf("Free list found best at offset %lld\n", (uintptr_t)*found_hdr - (uintptr_t)first_hdr);
 }

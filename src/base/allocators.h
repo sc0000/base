@@ -12,41 +12,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
-#ifndef DEFAULT_ALIGN
-    #if __STDC_VERSION__ >= 201112L
-        #define DEFAULT_ALIGN alignof(max_align_t)
-    #else
-        #define DEFAULT_ALIGN (sizeof(void*) * 2)
-    #endif
-#endif
-
-/* 
-  --- GENERAL PURPOSE UTILITY FUNCTIONS --- 
-*/
-
-/// @brief ---INTERNAL FUNCTION---
-/// Aligns a given pointer according to the given alignment size.
-/// Will crash if the alignment is not a power of 2.
-/// @return The aligned pointer.
-uintptr_t align_ptr(uintptr_t ptr, uintptr_t align);
-
-/// @brief ---INTERNAL FUNCTION---
-/// Aligns a given size (usually a buffer size) according to 
-/// the given alignment.
-/// @return The aligned size as uintptr_t.
-uintptr_t align_size(size_t size, uintptr_t align);
-
-/// @brief ---INTERNAL FUNCTION---
-/// Checks if a given memory address is a power of 2.
-static inline bool is_pow2(uintptr_t p)
-{
-  uintptr_t mod = p & (p - 1);
-  return mod == 0; 
-}
-
-/// @brief ---INTERNAL FUNCTION--- 
-/// Checks if a given memory address is within a given buffer.
-bool within_bounds(void* ptr, unsigned char* buf, size_t buf_size);
+#include "base/mem_utils.h"
+#include "base/log.h"
 
 /* 
   --- DYNAMIC ARRAY --- 
@@ -68,7 +35,7 @@ typedef struct da_hdr {
 static inline da_hdr_t* darray_get_hdr(void* darray)
 {
   uintptr_t hdr_size = align_size(sizeof(da_hdr_t), DEFAULT_ALIGN);
-  return (da_hdr_t*)((uintptr_t)darray - hdr_size);
+  return darray ? (da_hdr_t*)((uintptr_t)darray - hdr_size) : NULL;
 }
 
 /// @brief Initializes a dynamic array with the given size.
@@ -126,10 +93,11 @@ size_t darray_size(void* darray);
 size_t darray_capacity(void* darray);
 
 /// @brief Sets the `occupied` parameter of the array to the given number.
-/// This function is probably rarely useful. It was originally written
-/// as part of a software renderer, to reset the number of triangles
-/// in a rendered 3D object after the frustum clipping stage added
-/// a few temporary ones. Capacity remains unchanged.
+/// This function is probably rarely useful. Doesn't do anything if 
+/// new given size is greater than the size of the array. It was originally
+/// written as part of a software renderer, to reset the number of 
+/// triangles in a rendered 3D object after the frustum clipping stage 
+/// added a few temporary ones. Capacity remains unchanged.
 void darray_reset_size(void* darray, size_t size);
 
 /// @brief Sets the capacity of the array, to avoid unnecessary
@@ -214,6 +182,11 @@ static inline void  arena_resize_element(arena_t* a, void* element, size_t old_s
 /// @brief Sets all bytes in the arena to 0.
 static inline void arena_zero(arena_t* a)
 {
+  if (!a) {
+    flog(LOG_WARNING, "arena_zero(): arena invalid");
+    return;
+  }
+
   memset(a->buf, 0, a->size);
 }
 
@@ -222,6 +195,11 @@ static inline void arena_zero(arena_t* a)
 /// use another allocator. 
 static inline void arena_pop(arena_t* a)
 {
+  if (!a) {
+    flog(LOG_WARNING, "arena_pop(): arena invalid");
+    return;
+  }
+
   a->curr_offset = a->prev_offset;
 }
 
@@ -230,6 +208,11 @@ static inline void arena_pop(arena_t* a)
 /// itself, however! 
 static inline void arena_clear(arena_t* a)
 {
+  if (!a) {
+    flog(LOG_WARNING, "arena_clear(): arena invalid");
+    return;
+  }
+
   a->curr_offset = 0;
   a->prev_offset = 0;
 }
@@ -300,7 +283,11 @@ static inline void stack_resize_element(stack_t* s, void* element, size_t old_si
 /// @brief Removes the last element from the stack. 
 static inline void stack_pop(stack_t* s)
 {
-  if (!s->curr_hdr) return;
+  if (!s->curr_hdr) {
+    flog(LOG_WARNING, "stack_pop(): stack invalid");
+    return;
+  }
+
   s->curr_hdr = s->curr_hdr->linked_hdr;
   s->curr_offset = (uintptr_t)s->curr_hdr + sizeof(hdr_t); 
 }
@@ -310,6 +297,11 @@ static inline void stack_pop(stack_t* s)
 /// itself, however! 
 static inline void stack_clear(stack_t* s)
 {
+  if (!s->curr_hdr) {
+    flog(LOG_WARNING, "stack_clear(): stack invalid");
+    return;
+  }
+
   s->curr_hdr = NULL;
   s->curr_offset = 0;
 }
@@ -389,7 +381,7 @@ typedef enum {
 /// Returns the first header in the buffer.
 static inline fl_hdr_t* fl_first_hdr(free_list_t* fl)
 {
-  return (fl_hdr_t*)fl->buf;
+  return fl ? (fl_hdr_t*)fl->buf : NULL;
 }
 
 /// @brief Initializes the free list with manual alignment (probably rarely of use).
